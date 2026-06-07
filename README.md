@@ -1,16 +1,41 @@
-# React + Vite
+# GraphScope — Weighted Graph Visualizer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An interactive web application for loading tabular data files (CSV) and visualizing them as weighted graphs, where vertex and edge weights are reflected as physical sizes in the rendered visualization. Built with React and Vite.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **CSV Data Import** — Load data files in `.csv` format and parse them into graph structures
+- **Weighted Visualization** — Vertex and edge weights are interpreted as physical sizes (node radius, edge thickness)
+- **Interactive Graph** — Force-directed layout with draggable nodes, zoom, and pan (powered by `react-force-graph-2d`)
+- **Control Panel** — Adjust visualization parameters in real-time
+- **Image Export** — Save the resulting graph image in image format
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **React 19** + **Vite 8** — Fast modern frontend tooling
+- **react-force-graph-2d** — Force-directed graph rendering
+- **PapaParse** — CSV parsing
+- **Lucide React** — Icons
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Project Context
+
+This project corresponds to **Task №4** from the Graph Theory course (Software Solutions):
+
+> *Develop an application that: can load data files in .csv or other tabular formats; visualizes data as a graph with weights on vertices and edges, where the weights are interpreted as the physical size of the vertices and edges; can save the resulting graph image in image format.*
+
+## License
+
+MIT
