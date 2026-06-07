@@ -30,6 +30,18 @@ npm run dev
 npm run build
 ```
 
+## Graph Generator
+
+You can generate custom random graph `.csv` files using the provided Python script:
+
+```bash
+# Generate a graph with 20 vertices and 40 edges
+python3 generate_graph.py -v 20 -e 40
+
+# For more options
+python3 generate_graph.py --help
+```
+
 ## Project Context
 
 This project corresponds to **Task №4** from the Graph Theory course (Software Solutions):
