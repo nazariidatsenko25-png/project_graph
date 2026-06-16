@@ -50,6 +50,38 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
     if (setFgRef) setFgRef(fgRef);
   }, [fgRef, setFgRef]);
 
+  const { selectedNode, shortestPath } = settings;
+  const hasPath = shortestPath && shortestPath.pathNodes && shortestPath.pathNodes.size > 0;
+
+  const focusNeighbors = useMemo(() => {
+    if (!selectedNode || !data) return new Set();
+    const neighbors = new Set();
+    data.links.forEach(l => {
+      const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+      const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+      if (sourceId === selectedNode) neighbors.add(targetId);
+      if (targetId === selectedNode) neighbors.add(sourceId);
+    });
+    return neighbors;
+  }, [selectedNode, data]);
+
+  const isFaded = useCallback((nodeId) => {
+    if (hasPath) return !shortestPath.pathNodes.has(nodeId);
+    if (!selectedNode) return false;
+    return nodeId !== selectedNode && !focusNeighbors.has(nodeId);
+  }, [selectedNode, focusNeighbors, hasPath, shortestPath]);
+
+  const isLinkFaded = useCallback((link) => {
+    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+    if (hasPath) {
+      return !shortestPath.pathLinks.has(`${sourceId}->${targetId}`) && 
+             !shortestPath.pathLinks.has(`${targetId}->${sourceId}`);
+    }
+    if (!selectedNode) return false;
+    return sourceId !== selectedNode && targetId !== selectedNode;
+  }, [selectedNode, hasPath, shortestPath]);
+
   useEffect(() => {
     if (fgRef.current) {
       fgRef.current.d3Force('charge').strength(settings.charge);
@@ -67,15 +99,32 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
     }
   }, [data]);
 
+  const getScaledWeight = useCallback((weight) => {
+    if (settings.scalingMode === 'log') return Math.max(0.1, Math.log10(weight + 1));
+    if (settings.scalingMode === 'sqrt') return Math.max(0.1, Math.sqrt(weight));
+    return weight;
+  }, [settings.scalingMode]);
+
   const paintNode = useCallback(
     (node, ctx, globalScale) => {
       // Guard against missing coordinates during initialization
       if (node.x == null || node.y == null || isNaN(node.x) || isNaN(node.y)) return;
 
       const weight = node.weight || 1;
-      const radius = Math.max(3, weight * settings.nodeMultiplier);
+      const scaledWeight = getScaledWeight(weight);
+      const radius = Math.max(3, scaledWeight * settings.nodeMultiplier);
       const isHovered = node.id === settings.hoverNode;
-      const [r, g, b] = weightToColor(weight, minWeight, maxWeight);
+      const isSelected = node.id === settings.selectedNode;
+      const isPathNode = hasPath && shortestPath.pathNodes.has(node.id);
+
+      let [r, g, b] = weightToColor(weight, minWeight, maxWeight);
+      if (isPathNode) {
+        [r, g, b] = [252, 211, 77]; // Amber highlight for path
+      }
+
+      const faded = isFaded(node.id);
+      const opacity = faded ? 0.15 : 1;
+      const glowOpacity = isPathNode ? 0.4 : (faded ? 0.05 : 0.25);
 
       // Outer glow — constellation effect
       const glowRadius = radius * 2.5;
@@ -83,7 +132,7 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
         node.x, node.y, radius * 0.3,
         node.x, node.y, glowRadius
       );
-      gradient.addColorStop(0, `rgba(${r},${g},${b},0.25)`);
+      gradient.addColorStop(0, `rgba(${r},${g},${b},${glowOpacity})`);
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.beginPath();
       ctx.arc(node.x, node.y, glowRadius, 0, 2 * Math.PI);
@@ -93,20 +142,20 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
       // Core circle
       ctx.beginPath();
       ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillStyle = `rgba(${r},${g},${b},${opacity})`;
       ctx.fill();
 
       // Subtle border
       ctx.lineWidth = 0.5 / globalScale;
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.strokeStyle = `rgba(255,255,255,${faded ? 0.05 : 0.3})`;
       ctx.stroke();
 
-      // Hover ring
-      if (isHovered) {
+      // Highlight rings
+      if (isHovered || isSelected || isPathNode) {
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius + 4 / globalScale, 0, 2 * Math.PI);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2 / globalScale;
+        ctx.strokeStyle = (isSelected || isPathNode) ? `rgba(${r},${g},${b},0.8)` : '#ffffff';
+        ctx.lineWidth = ((isSelected || isPathNode) ? 4 : 2) / globalScale;
         ctx.stroke();
       }
 
@@ -117,28 +166,43 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
         ctx.font = `600 ${fontSize}px 'Space Grotesk', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = isHovered ? '#ffffff' : 'rgba(232,237,245,0.9)';
+        ctx.fillStyle = (isHovered || node.id === settings.selectedNode) ? '#ffffff' : `rgba(232,237,245,${faded ? 0.2 : 0.9})`;
         const labelY = radius < 8 / globalScale ? node.y + radius + fontSize : node.y;
         ctx.fillText(node.id, node.x, labelY);
       }
     },
-    [settings.nodeMultiplier, settings.hoverNode, settings.showLabels, minWeight, maxWeight]
+    [settings.nodeMultiplier, settings.hoverNode, settings.showLabels, minWeight, maxWeight, getScaledWeight, isFaded, settings.selectedNode]
   );
 
   // Use built-in linkWidth + linkColor instead of custom linkCanvasObject
   // to avoid crashes from accessing uninitialized source/target coordinates
   const getLinkWidth = useCallback(
-    (link) => Math.max(0.5, (link.weight || 1) * settings.linkMultiplier),
-    [settings.linkMultiplier]
+    (link) => Math.max(0.5, getScaledWeight(link.weight || 1) * settings.linkMultiplier),
+    [settings.linkMultiplier, getScaledWeight]
   );
 
   const getLinkColor = useCallback(
     (link) => {
       const weight = link.weight || 1;
-      const opacity = Math.min(0.7, 0.15 + weight * 0.06);
+      let opacity = Math.min(0.7, 0.15 + weight * 0.06);
+      
+      const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      const isPathLink = hasPath && (
+        shortestPath.pathLinks.has(`${sourceId}->${targetId}`) || 
+        shortestPath.pathLinks.has(`${targetId}->${sourceId}`)
+      );
+
+      if (isLinkFaded(link)) {
+        opacity = 0.05;
+      } else if (isPathLink) {
+        return `rgba(252, 211, 77, 0.9)`; // Amber highlight for path links
+      } else if (settings.selectedNode) {
+        opacity = Math.min(0.9, opacity + 0.3); // Highlight active links
+      }
       return `rgba(120, 200, 255, ${opacity})`;
     },
-    []
+    [isLinkFaded, settings.selectedNode, hasPath, shortestPath]
   );
 
   return (
@@ -151,7 +215,7 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
         nodeCanvasObject={paintNode}
         nodePointerAreaPaint={(node, color, ctx) => {
           if (node.x == null || node.y == null) return;
-          const r = Math.max(5, (node.weight || 1) * settings.nodeMultiplier + 4);
+          const r = Math.max(5, getScaledWeight(node.weight || 1) * settings.nodeMultiplier + 4);
           ctx.beginPath();
           ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
           ctx.fillStyle = color;
@@ -159,7 +223,12 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
         }}
         linkWidth={getLinkWidth}
         linkColor={getLinkColor}
+        linkDirectionalArrowLength={3.5}
+        linkDirectionalArrowRelPos={1}
         onNodeHover={(node) => settings.setHoverNode(node ? node.id : null)}
+        onLinkHover={(link) => settings.setHoverLink(link)}
+        onNodeClick={(node) => settings.setSelectedNode(node ? (settings.selectedNode === node.id ? null : node.id) : null)}
+        onBackgroundClick={() => settings.setSelectedNode(null)}
         enableZoomInteraction={true}
         enablePanInteraction={true}
         cooldownTime={3000}

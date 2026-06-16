@@ -1,20 +1,23 @@
 # GraphScope — Weighted Graph Visualizer
 
-An interactive web application for loading tabular data files (CSV) and visualizing them as weighted graphs, where vertex and edge weights are reflected as physical sizes in the rendered visualization. Built with React and Vite.
+An interactive web application for loading tabular data files and visualizing them as weighted graphs, where vertex and edge weights are reflected as physical sizes in the rendered visualization. Built with React and Vite.
 
 ## Features
 
-- **CSV Data Import** — Load data files in `.csv` format and parse them into graph structures
-- **Weighted Visualization** — Vertex and edge weights are interpreted as physical sizes (node radius, edge thickness)
-- **Interactive Graph** — Force-directed layout with draggable nodes, zoom, and pan (powered by `react-force-graph-2d`)
-- **Control Panel** — Adjust visualization parameters in real-time
-- **Image Export** — Save the resulting graph image in image format
+- **Multi-format Data Import** — Load data files in `.csv`, `.tsv`, and `.txt` formats. Includes a dynamic column mapping UI to handle various data structures.
+- **Weighted Visualization** — Vertex and edge weights are interpreted as physical sizes (node radius, edge thickness) with support for Linear, Square Root, and Logarithmic scaling modes.
+- **Interactive Graph** — Force-directed layout with draggable nodes, zoom, and pan. Includes directional arrows for edges and interactive tooltips.
+- **Focus Mode** — Click on any vertex to isolate it and its immediate connections, fading out the rest of the graph for focused analysis.
+- **Shortest Path (Pathfinding)** — Built-in Dijkstra's algorithm to calculate and visually highlight the shortest undirected path between any two vertices, calculating distance using edge weights.
+- **Real-time Analytics** — Displays graph metrics such as total Vertices, Edges, Max Degree, and Graph Density.
+- **Control Panel** — Adjust physics engine parameters (repulsion, link distance) and visual sizing in real-time.
+- **Export Options** — Save the resulting graph as an image (`.png`), vector (`.svg`), or raw graph data (`.json`).
 
 ## Tech Stack
 
 - **React 19** + **Vite 8** — Fast modern frontend tooling
 - **react-force-graph-2d** — Force-directed graph rendering
-- **PapaParse** — CSV parsing
+- **PapaParse** — Tabular data parsing
 - **Lucide React** — Icons
 
 ## Getting Started
