@@ -251,6 +251,28 @@ export default function GraphVisualizer({ setFgRef }: { setFgRef?: (ref: any) =>
         linkColor={getLinkColor}
         linkDirectionalArrowLength={3.5}
         linkDirectionalArrowRelPos={1}
+        linkDirectionalParticles={(link: any) => {
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+          
+          if (hasPath && (shortestPath?.pathLinks.has(`${sourceId}->${targetId}`) || shortestPath?.pathLinks.has(`${targetId}->${sourceId}`))) {
+            return 4; // Path particles
+          }
+          if (selectedNode && (sourceId === selectedNode || targetId === selectedNode)) {
+            return 2; // Selection particles
+          }
+          return 0; // No particles otherwise
+        }}
+        linkDirectionalParticleSpeed={(link: any) => {
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+          if (hasPath && (shortestPath?.pathLinks.has(`${sourceId}->${targetId}`) || shortestPath?.pathLinks.has(`${targetId}->${sourceId}`))) {
+            return 0.015; // Fast speed for path
+          }
+          return 0.005; // Normal speed
+        }}
+        linkDirectionalParticleWidth={(link: any) => Math.max(1.5, getScaledWeight(link.weight || 1) * settings.linkMultiplier)}
+        linkDirectionalParticleColor={() => '#fcd34d'}
         onNodeHover={(node: any) => setHoverNode(node ? String(node.id) : null)}
         onLinkHover={(link) => setHoverLink(link as any)}
         onNodeClick={(node: any) => setSelectedNode(node ? (selectedNode === String(node.id) ? null : String(node.id)) : null)}

@@ -5,10 +5,13 @@ export type GraphNode = {
   weight: number;
   x?: number;
   y?: number;
+  z?: number;
   vx?: number;
   vy?: number;
+  vz?: number;
   fx?: number;
   fy?: number;
+  fz?: number;
 };
 
 export type GraphLink = {
@@ -35,6 +38,7 @@ export type GraphSettings = {
 };
 
 type GraphStore = {
+  is3DMode: boolean;
   graphData: GraphData | null;
   settings: GraphSettings;
   hoverNode: string | null;
@@ -43,6 +47,7 @@ type GraphStore = {
   pathStart: string;
   pathEnd: string;
 
+  set3DMode: (is3D: boolean) => void;
   setGraphData: (data: GraphData | null) => void;
   updateSettings: (newSettings: Partial<GraphSettings>) => void;
   setHoverNode: (id: string | null) => void;
@@ -63,6 +68,7 @@ const initialSettings: GraphSettings = {
 };
 
 export const useGraphStore = create<GraphStore>((set) => ({
+  is3DMode: false,
   graphData: null,
   settings: initialSettings,
   hoverNode: null,
@@ -71,6 +77,7 @@ export const useGraphStore = create<GraphStore>((set) => ({
   pathStart: '',
   pathEnd: '',
 
+  set3DMode: (is3D) => set({ is3DMode: is3D }),
   setGraphData: (data) => set({ graphData: data }),
   updateSettings: (newSettings) =>
     set((state) => ({ settings: { ...state.settings, ...newSettings } })),

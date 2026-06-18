@@ -3,12 +3,13 @@
 import React, { useCallback, useState } from 'react';
 import FileUpload from '../components/FileUpload';
 import GraphVisualizer from '../components/GraphVisualizer';
+import GraphVisualizer3D from '../components/GraphVisualizer3D';
 import ControlPanel from '../components/ControlPanel';
 import { useGraphStore } from '../store/useGraphStore';
 import { exportToPng, exportToJson, exportToSvg } from '../utils/export';
 
 export default function Page() {
-  const { graphData, settings, hoverNode, hoverLink } = useGraphStore();
+  const { graphData, settings, hoverNode, hoverLink, is3DMode } = useGraphStore();
   const [fgRef, setFgRef] = useState<any>(null);
 
   const handleExportPng = useCallback(() => {
@@ -36,7 +37,11 @@ export default function Page() {
         <FileUpload />
       ) : (
         <>
-          <GraphVisualizer setFgRef={setFgRef} />
+          {is3DMode ? (
+            <GraphVisualizer3D setFgRef={setFgRef} />
+          ) : (
+            <GraphVisualizer setFgRef={setFgRef} />
+          )}
           
           <ControlPanel
             onExportPng={handleExportPng}

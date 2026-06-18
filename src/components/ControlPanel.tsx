@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Settings, Download, RotateCcw, PanelRightClose, PanelRightOpen, Code, Image as ImageIcon } from 'lucide-react';
+import { Settings, Download, RotateCcw, PanelRightClose, PanelRightOpen, Code, Image as ImageIcon, Box, Frame } from 'lucide-react';
 import { useGraphStore, ScalingMode } from '../store/useGraphStore';
 import { findShortestPath } from '../utils/pathfinding';
 import clsx from 'clsx';
@@ -23,6 +23,8 @@ export default function ControlPanel({ onExportPng, onExportSvg, onExportJson }:
     pathEnd,
     setPathEnd,
     reset,
+    is3DMode,
+    set3DMode,
   } = useGraphStore();
 
   const nodeCount = graphData?.nodes?.length || 0;
@@ -94,6 +96,38 @@ export default function ControlPanel({ onExportPng, onExportSvg, onExportJson }:
             <span>Density: <strong className="text-white">{metrics.density}</strong></span>
           </div>
         )}
+
+        <div className="h-px bg-[var(--glass-border)] w-full my-1" />
+
+        {/* 2D / 3D Toggle */}
+        <div className="flex items-center justify-between p-1">
+          <span className="text-sm font-semibold tracking-wider text-[var(--foreground)] uppercase flex items-center gap-2">
+            {is3DMode ? <Box size={16} className="text-[var(--accent)]" /> : <Frame size={16} className="text-[var(--highlight)]" />}
+            Mode
+          </span>
+          <div className="flex items-center bg-[rgba(0,0,0,0.3)] rounded-lg p-1 border border-[var(--glass-border)]">
+            <button
+              onClick={() => set3DMode(false)}
+              className={clsx(
+                "px-3 py-1 text-xs font-bold rounded-md transition-all duration-200",
+                !is3DMode ? "bg-[var(--highlight)] text-[#0b1021] shadow-[0_0_10px_rgba(129,140,248,0.3)]" : "text-[var(--text-secondary)] hover:text-white"
+              )}
+            >
+              2D
+            </button>
+            <button
+              onClick={() => set3DMode(true)}
+              className={clsx(
+                "px-3 py-1 text-xs font-bold rounded-md transition-all duration-200",
+                is3DMode ? "bg-[var(--accent)] text-[#0b1021] shadow-[0_0_10px_rgba(34,211,238,0.3)]" : "text-[var(--text-secondary)] hover:text-white"
+              )}
+            >
+              3D
+            </button>
+          </div>
+        </div>
+
+        <div className="h-px bg-[var(--glass-border)] w-full my-1" />
 
         {/* Toggle: Scaling Mode */}
         <div className="flex flex-col gap-1">
