@@ -1,10 +1,19 @@
+'use client';
+
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import ForceGraph2D from 'react-force-graph-2d';
+import dynamic from 'next/dynamic';
+import { useGraphStore } from '../store/useGraphStore';
+import { findShortestPath } from '../utils/pathfinding';
+
+// ForceGraph2D requires `window` and fails on SSR.
+const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), {
+  ssr: false,
+});
 
 /**
  * Maps a weight value to a color on the blue → cyan → amber gradient.
  */
-const weightToColor = (weight, minW, maxW) => {
+const weightToColor = (weight: number, minW: number, maxW: number): [number, number, number] => {
   if (maxW === minW) return [34, 211, 238]; // cyan fallback
   const t = Math.min(1, Math.max(0, (weight - minW) / (maxW - minW)));
 
@@ -25,20 +34,24 @@ const weightToColor = (weight, minW, maxW) => {
   }
 };
 
-const GraphVisualizer = ({ data, settings, setFgRef }) => {
-  const fgRef = useRef();
-  const [dimensions, setDimensions] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
+export default function GraphVisualizer({ setFgRef }: { setFgRef?: (ref: any) => void }) {
+  const fgRef = useRef<any>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
-  const { minWeight, maxWeight } = useMemo(() => {
-    if (!data || !data.nodes.length) return { minWeight: 1, maxWeight: 1 };
-    const weights = data.nodes.map((n) => n.weight || 1);
-    return { minWeight: Math.min(...weights), maxWeight: Math.max(...weights) };
-  }, [data]);
+  const {
+    graphData,
+    settings,
+    hoverNode,
+    selectedNode,
+    pathStart,
+    pathEnd,
+    setHoverNode,
+    setHoverLink,
+    setSelectedNode,
+  } = useGraphStore();
 
   useEffect(() => {
+    setDimensions({ width: window.innerWidth, height: window.innerHeight });
     const handleResize = () => {
       setDimensions({ width: window.innerWidth, height: window.innerHeight });
     };
@@ -50,33 +63,45 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
     if (setFgRef) setFgRef(fgRef);
   }, [fgRef, setFgRef]);
 
-  const { selectedNode, shortestPath } = settings;
+  const { minWeight, maxWeight } = useMemo(() => {
+    if (!graphData || !graphData.nodes.length) return { minWeight: 1, maxWeight: 1 };
+    const weights = graphData.nodes.map((n) => n.weight || 1);
+    return { minWeight: Math.min(...weights), maxWeight: Math.max(...weights) };
+  }, [graphData]);
+
+  const shortestPath = useMemo(() => {
+    if (graphData && pathStart && pathEnd) {
+      return findShortestPath(graphData, pathStart, pathEnd);
+    }
+    return null;
+  }, [graphData, pathStart, pathEnd]);
+
   const hasPath = shortestPath && shortestPath.pathNodes && shortestPath.pathNodes.size > 0;
 
   const focusNeighbors = useMemo(() => {
-    if (!selectedNode || !data) return new Set();
-    const neighbors = new Set();
-    data.links.forEach(l => {
-      const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
-      const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+    if (!selectedNode || !graphData) return new Set<string>();
+    const neighbors = new Set<string>();
+    graphData.links.forEach(l => {
+      const sourceId = typeof l.source === 'object' ? (l.source as any).id : l.source;
+      const targetId = typeof l.target === 'object' ? (l.target as any).id : l.target;
       if (sourceId === selectedNode) neighbors.add(targetId);
       if (targetId === selectedNode) neighbors.add(sourceId);
     });
     return neighbors;
-  }, [selectedNode, data]);
+  }, [selectedNode, graphData]);
 
-  const isFaded = useCallback((nodeId) => {
-    if (hasPath) return !shortestPath.pathNodes.has(nodeId);
+  const isFaded = useCallback((nodeId: string) => {
+    if (hasPath) return !shortestPath?.pathNodes.has(nodeId);
     if (!selectedNode) return false;
     return nodeId !== selectedNode && !focusNeighbors.has(nodeId);
   }, [selectedNode, focusNeighbors, hasPath, shortestPath]);
 
-  const isLinkFaded = useCallback((link) => {
+  const isLinkFaded = useCallback((link: any) => {
     const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
     const targetId = typeof link.target === 'object' ? link.target.id : link.target;
     if (hasPath) {
-      return !shortestPath.pathLinks.has(`${sourceId}->${targetId}`) && 
-             !shortestPath.pathLinks.has(`${targetId}->${sourceId}`);
+      return !shortestPath?.pathLinks.has(`${sourceId}->${targetId}`) && 
+             !shortestPath?.pathLinks.has(`${targetId}->${sourceId}`);
     }
     if (!selectedNode) return false;
     return sourceId !== selectedNode && targetId !== selectedNode;
@@ -84,38 +109,39 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
 
   useEffect(() => {
     if (fgRef.current) {
-      fgRef.current.d3Force('charge').strength(settings.charge);
-      fgRef.current.d3Force('link').distance(settings.linkDistance);
+      fgRef.current.d3Force('charge')?.strength(settings.charge);
+      fgRef.current.d3Force('link')?.distance(settings.linkDistance);
       fgRef.current.d3ReheatSimulation();
     }
   }, [settings.charge, settings.linkDistance]);
 
   // Zoom to fit on first load
   useEffect(() => {
-    if (fgRef.current && data) {
-      setTimeout(() => {
-        fgRef.current.zoomToFit(600, 80);
+    if (fgRef.current && graphData) {
+      const timer = setTimeout(() => {
+        fgRef.current?.zoomToFit?.(600, 80);
       }, 800);
+      return () => clearTimeout(timer);
     }
-  }, [data]);
+  }, [graphData]);
 
-  const getScaledWeight = useCallback((weight) => {
+  const getScaledWeight = useCallback((weight: number) => {
     if (settings.scalingMode === 'log') return Math.max(0.1, Math.log10(weight + 1));
     if (settings.scalingMode === 'sqrt') return Math.max(0.1, Math.sqrt(weight));
     return weight;
   }, [settings.scalingMode]);
 
   const paintNode = useCallback(
-    (node, ctx, globalScale) => {
+    (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
       // Guard against missing coordinates during initialization
       if (node.x == null || node.y == null || isNaN(node.x) || isNaN(node.y)) return;
 
       const weight = node.weight || 1;
       const scaledWeight = getScaledWeight(weight);
       const radius = Math.max(3, scaledWeight * settings.nodeMultiplier);
-      const isHovered = node.id === settings.hoverNode;
-      const isSelected = node.id === settings.selectedNode;
-      const isPathNode = hasPath && shortestPath.pathNodes.has(node.id);
+      const isHovered = node.id === hoverNode;
+      const isSelected = node.id === selectedNode;
+      const isPathNode = hasPath && shortestPath?.pathNodes.has(node.id);
 
       let [r, g, b] = weightToColor(weight, minWeight, maxWeight);
       if (isPathNode) {
@@ -163,57 +189,57 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
       const labelThreshold = settings.showLabels ? 0.3 : 2.5;
       if (globalScale > labelThreshold || radius > 12) {
         const fontSize = Math.max(11 / globalScale, 2.5);
-        ctx.font = `600 ${fontSize}px 'Space Grotesk', sans-serif`;
+        ctx.font = `600 ${fontSize}px 'Space Grotesk', 'Inter', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = (isHovered || node.id === settings.selectedNode) ? '#ffffff' : `rgba(232,237,245,${faded ? 0.2 : 0.9})`;
+        ctx.fillStyle = (isHovered || node.id === selectedNode) ? '#ffffff' : `rgba(232,237,245,${faded ? 0.2 : 0.9})`;
         const labelY = radius < 8 / globalScale ? node.y + radius + fontSize : node.y;
         ctx.fillText(node.id, node.x, labelY);
       }
     },
-    [settings.nodeMultiplier, settings.hoverNode, settings.showLabels, minWeight, maxWeight, getScaledWeight, isFaded, settings.selectedNode]
+    [settings.nodeMultiplier, hoverNode, settings.showLabels, minWeight, maxWeight, getScaledWeight, isFaded, selectedNode, hasPath, shortestPath]
   );
 
-  // Use built-in linkWidth + linkColor instead of custom linkCanvasObject
-  // to avoid crashes from accessing uninitialized source/target coordinates
   const getLinkWidth = useCallback(
-    (link) => Math.max(0.5, getScaledWeight(link.weight || 1) * settings.linkMultiplier),
+    (link: any) => Math.max(0.5, getScaledWeight(link.weight || 1) * settings.linkMultiplier),
     [settings.linkMultiplier, getScaledWeight]
   );
 
   const getLinkColor = useCallback(
-    (link) => {
+    (link: any) => {
       const weight = link.weight || 1;
       let opacity = Math.min(0.7, 0.15 + weight * 0.06);
       
       const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
       const targetId = typeof link.target === 'object' ? link.target.id : link.target;
       const isPathLink = hasPath && (
-        shortestPath.pathLinks.has(`${sourceId}->${targetId}`) || 
-        shortestPath.pathLinks.has(`${targetId}->${sourceId}`)
+        shortestPath?.pathLinks.has(`${sourceId}->${targetId}`) || 
+        shortestPath?.pathLinks.has(`${targetId}->${sourceId}`)
       );
 
       if (isLinkFaded(link)) {
         opacity = 0.05;
       } else if (isPathLink) {
         return `rgba(252, 211, 77, 0.9)`; // Amber highlight for path links
-      } else if (settings.selectedNode) {
+      } else if (selectedNode) {
         opacity = Math.min(0.9, opacity + 0.3); // Highlight active links
       }
       return `rgba(120, 200, 255, ${opacity})`;
     },
-    [isLinkFaded, settings.selectedNode, hasPath, shortestPath]
+    [isLinkFaded, selectedNode, hasPath, shortestPath]
   );
 
+  if (dimensions.width === 0) return null;
+
   return (
-    <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-deep)' }}>
+    <div className="absolute inset-0 bg-transparent z-0">
       <ForceGraph2D
         ref={fgRef}
         width={dimensions.width}
         height={dimensions.height}
-        graphData={data}
+        graphData={graphData!}
         nodeCanvasObject={paintNode}
-        nodePointerAreaPaint={(node, color, ctx) => {
+        nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
           if (node.x == null || node.y == null) return;
           const r = Math.max(5, getScaledWeight(node.weight || 1) * settings.nodeMultiplier + 4);
           ctx.beginPath();
@@ -225,10 +251,10 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
         linkColor={getLinkColor}
         linkDirectionalArrowLength={3.5}
         linkDirectionalArrowRelPos={1}
-        onNodeHover={(node) => settings.setHoverNode(node ? node.id : null)}
-        onLinkHover={(link) => settings.setHoverLink(link)}
-        onNodeClick={(node) => settings.setSelectedNode(node ? (settings.selectedNode === node.id ? null : node.id) : null)}
-        onBackgroundClick={() => settings.setSelectedNode(null)}
+        onNodeHover={(node: any) => setHoverNode(node ? String(node.id) : null)}
+        onLinkHover={(link) => setHoverLink(link as any)}
+        onNodeClick={(node: any) => setSelectedNode(node ? (selectedNode === String(node.id) ? null : String(node.id)) : null)}
+        onBackgroundClick={() => setSelectedNode(null)}
         enableZoomInteraction={true}
         enablePanInteraction={true}
         cooldownTime={3000}
@@ -236,6 +262,4 @@ const GraphVisualizer = ({ data, settings, setFgRef }) => {
       />
     </div>
   );
-};
-
-export default GraphVisualizer;
+}
