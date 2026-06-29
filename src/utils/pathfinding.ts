@@ -1,14 +1,70 @@
-import { GraphData, GraphLink } from '../store/useGraphStore';
+import { GraphData } from '../store/useGraphStore';
 
-type EdgeInfo = {
+interface EdgeInfo {
   to: string;
   weight: number;
-};
+}
+
+// ---------------------------------------------------------------------------
+// Binary min-heap priority queue — O((V+E) log V) Dijkstra
+// ---------------------------------------------------------------------------
+
+class MinHeap {
+  private heap: [number, string][] = []; // [distance, nodeId]
+
+  get size(): number {
+    return this.heap.length;
+  }
+
+  push(distance: number, nodeId: string): void {
+    this.heap.push([distance, nodeId]);
+    this.bubbleUp(this.heap.length - 1);
+  }
+
+  pop(): [number, string] | undefined {
+    if (this.heap.length === 0) return undefined;
+    const top = this.heap[0];
+    const last = this.heap.pop()!;
+    if (this.heap.length > 0) {
+      this.heap[0] = last;
+      this.sinkDown(0);
+    }
+    return top;
+  }
+
+  private bubbleUp(i: number): void {
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (this.heap[parent][0] <= this.heap[i][0]) break;
+      [this.heap[parent], this.heap[i]] = [this.heap[i], this.heap[parent]];
+      i = parent;
+    }
+  }
+
+  private sinkDown(i: number): void {
+    const n = this.heap.length;
+    while (true) {
+      let smallest = i;
+      const left = 2 * i + 1;
+      const right = 2 * i + 2;
+      if (left < n && this.heap[left][0] < this.heap[smallest][0]) smallest = left;
+      if (right < n && this.heap[right][0] < this.heap[smallest][0]) smallest = right;
+      if (smallest === i) break;
+      [this.heap[smallest], this.heap[i]] = [this.heap[i], this.heap[smallest]];
+      i = smallest;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dijkstra — finds shortest path between two nodes
+// ---------------------------------------------------------------------------
 
 export function findShortestPath(
   graphData: GraphData,
   startId: string,
-  endId: string
+  endId: string,
+  isDirected = false,
 ) {
   if (!graphData || !startId || !endId || startId === endId) return null;
 
@@ -18,49 +74,50 @@ export function findShortestPath(
   });
 
   graphData.links.forEach((l) => {
-    const sourceId =
-      typeof l.source === 'object' && l.source !== null ? l.source.id : l.source;
-    const targetId =
-      typeof l.target === 'object' && l.target !== null ? l.target.id : l.target;
+    const srcId = typeof l.source === 'object' && l.source !== null ? l.source.id : (l.source as string);
+    const tgtId = typeof l.target === 'object' && l.target !== null ? l.target.id : (l.target as string);
 
-    if (!graph[sourceId]) graph[sourceId] = [];
-    if (!graph[targetId]) graph[targetId] = [];
+    if (!graph[srcId]) graph[srcId] = [];
+    if (!graph[tgtId]) graph[tgtId] = [];
 
     const weight = l.weight || 1;
-    graph[sourceId].push({ to: targetId, weight });
-    graph[targetId].push({ to: sourceId, weight }); // Undirected
+    graph[srcId].push({ to: tgtId, weight });
+    if (!isDirected) {
+      graph[tgtId].push({ to: srcId, weight });
+    }
   });
 
   const distances: Record<string, number> = {};
   const previous: Record<string, string | null> = {};
-  const pq = new Set(graphData.nodes.map((n) => n.id));
+  const visited = new Set<string>();
+  const pq = new MinHeap();
 
   graphData.nodes.forEach((n) => {
     distances[n.id] = Infinity;
     previous[n.id] = null;
   });
+
   distances[startId] = 0;
+  pq.push(0, startId);
 
   while (pq.size > 0) {
-    let minNode: string | null = null;
-    let minDistance = Infinity;
-    for (const nodeId of pq) {
-      if (distances[nodeId] < minDistance) {
-        minDistance = distances[nodeId];
-        minNode = nodeId;
-      }
-    }
+    const entry = pq.pop();
+    if (!entry) break;
+    const [dist, node] = entry;
 
-    if (minNode === null || minNode === endId) break;
-    pq.delete(minNode);
+    if (visited.has(node)) continue;
+    visited.add(node);
 
-    if (graph[minNode]) {
-      for (const edge of graph[minNode]) {
-        const alt = distances[minNode] + edge.weight;
-        if (alt < distances[edge.to]) {
-          distances[edge.to] = alt;
-          previous[edge.to] = minNode;
-        }
+    if (node === endId) break;
+
+    if (dist > distances[node]) continue;
+
+    for (const edge of graph[node] ?? []) {
+      const alt = distances[node] + edge.weight;
+      if (alt < distances[edge.to]) {
+        distances[edge.to] = alt;
+        previous[edge.to] = node;
+        pq.push(alt, edge.to);
       }
     }
   }

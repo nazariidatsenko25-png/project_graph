@@ -39,6 +39,7 @@ export type GraphSettings = {
 
 type GraphStore = {
   is3DMode: boolean;
+  isDirected: boolean;
   graphData: GraphData | null;
   settings: GraphSettings;
   hoverNode: string | null;
@@ -48,6 +49,7 @@ type GraphStore = {
   pathEnd: string;
 
   set3DMode: (is3D: boolean) => void;
+  setDirected: (directed: boolean) => void;
   setGraphData: (data: GraphData | null) => void;
   updateSettings: (newSettings: Partial<GraphSettings>) => void;
   setHoverNode: (id: string | null) => void;
@@ -69,6 +71,7 @@ const initialSettings: GraphSettings = {
 
 export const useGraphStore = create<GraphStore>((set) => ({
   is3DMode: false,
+  isDirected: false,
   graphData: null,
   settings: initialSettings,
   hoverNode: null,
@@ -78,6 +81,7 @@ export const useGraphStore = create<GraphStore>((set) => ({
   pathEnd: '',
 
   set3DMode: (is3D) => set({ is3DMode: is3D }),
+  setDirected: (directed) => set({ isDirected: directed }),
   setGraphData: (data) => set({ graphData: data }),
   updateSettings: (newSettings) =>
     set((state) => ({ settings: { ...state.settings, ...newSettings } })),

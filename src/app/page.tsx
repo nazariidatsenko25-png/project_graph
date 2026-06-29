@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import FileUpload from '../components/FileUpload';
 import GraphVisualizer from '../components/GraphVisualizer';
 import GraphVisualizer3D from '../components/GraphVisualizer3D';
@@ -8,29 +8,75 @@ import ControlPanel from '../components/ControlPanel';
 import { useGraphStore } from '../store/useGraphStore';
 import { exportToPng, exportToJson, exportToSvg } from '../utils/export';
 
+function HoverTooltip({
+  label,
+  value,
+  extra,
+  extraLabel,
+}: {
+  label: string;
+  value: React.ReactNode;
+  extra?: React.ReactNode;
+  extraLabel?: string;
+}) {
+  return (
+    <div
+      role="tooltip"
+      aria-live="polite"
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 bg-[var(--glass-bg)] backdrop-blur-md border border-[var(--glass-border)] rounded-[var(--radius-md)] px-5 py-2.5 flex items-center gap-4 shadow-[var(--glass-shadow)] animate-in fade-in slide-in-from-bottom-4 pointer-events-none"
+    >
+      <span className="text-[var(--text-secondary)] text-sm" style={{ fontFamily: 'var(--font-ui)' }}>
+        {label}
+      </span>
+      <span className="font-bold text-[var(--accent)] text-base" style={{ fontFamily: 'var(--font-mono)' }}>
+        {value}
+      </span>
+      {extra != null && (
+        <>
+          <span className="w-px h-5 bg-[var(--border-subtle)]" />
+          <span className="text-[var(--text-secondary)] text-sm" style={{ fontFamily: 'var(--font-ui)' }}>
+            {extraLabel}
+          </span>
+          <span className="font-bold text-[var(--highlight)] text-base" style={{ fontFamily: 'var(--font-mono)' }}>
+            {extra}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Page() {
   const { graphData, settings, hoverNode, hoverLink, is3DMode } = useGraphStore();
-  const [fgRef, setFgRef] = useState<any>(null);
+  const fgRef = useRef<unknown>(null);
+
+  const handleSetFgRef = useCallback((ref: React.RefObject<unknown>) => {
+    (fgRef as React.MutableRefObject<unknown>).current = ref.current;
+  }, []);
 
   const handleExportPng = useCallback(() => {
-    if (!fgRef || !fgRef.current) return;
     requestAnimationFrame(() => {
       const canvas = document.querySelector('canvas');
       exportToPng(canvas);
     });
-  }, [fgRef]);
+  }, []);
 
-  const handleExportSvg = useCallback(() => {
-    exportToSvg(graphData, settings);
-  }, [graphData, settings]);
+  const handleExportSvg = useCallback(() => exportToSvg(graphData, settings), [graphData, settings]);
+  const handleExportJson = useCallback(() => exportToJson(graphData), [graphData]);
 
-  const handleExportJson = useCallback(() => {
-    exportToJson(graphData);
-  }, [graphData]);
+  const edgeSource = hoverLink
+    ? typeof hoverLink.source === 'object'
+      ? (hoverLink.source as { id: string }).id
+      : hoverLink.source
+    : null;
+  const edgeTarget = hoverLink
+    ? typeof hoverLink.target === 'object'
+      ? (hoverLink.target as { id: string }).id
+      : hoverLink.target
+    : null;
 
   return (
     <main className="min-h-screen relative overflow-hidden bg-[var(--background)]">
-      {/* Animated ambient background */}
       <div className="scene-bg" />
 
       {!graphData ? (
@@ -38,46 +84,33 @@ export default function Page() {
       ) : (
         <>
           {is3DMode ? (
-            <GraphVisualizer3D setFgRef={setFgRef} />
+            <GraphVisualizer3D setFgRef={handleSetFgRef} />
           ) : (
-            <GraphVisualizer setFgRef={setFgRef} />
+            <GraphVisualizer setFgRef={handleSetFgRef} />
           )}
-          
+
           <ControlPanel
             onExportPng={handleExportPng}
             onExportSvg={handleExportSvg}
             onExportJson={handleExportJson}
           />
 
-          {/* Hover tooltip showing node weight */}
           {hoverNode && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-[var(--glass-bg)] backdrop-blur-md border border-[var(--glass-border)] rounded-[var(--radius-md)] px-5 py-2.5 flex items-center gap-4 shadow-[var(--glass-shadow)] animate-in fade-in slide-in-from-bottom-4">
-              <span className="text-[var(--text-secondary)] text-sm font-['Space_Grotesk']">Vertex</span>
-              <span className="font-bold text-[var(--accent)] text-base font-['Space_Grotesk']">
-                {hoverNode}
-              </span>
-              <span className="w-px h-5 bg-[var(--border-subtle)]" />
-              <span className="text-[var(--text-secondary)] text-sm font-['Space_Grotesk']">Weight</span>
-              <span className="font-bold text-[var(--highlight)] text-base font-['Space_Grotesk']">
-                {graphData.nodes.find((n) => n.id === hoverNode)?.weight ?? '—'}
-              </span>
-            </div>
+            <HoverTooltip
+              label="Vertex"
+              value={hoverNode}
+              extraLabel="Weight"
+              extra={graphData.nodes.find((n) => n.id === hoverNode)?.weight ?? '—'}
+            />
           )}
 
-          {/* Hover tooltip showing edge weight */}
           {hoverLink && !hoverNode && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-[var(--glass-bg)] backdrop-blur-md border border-[var(--glass-border)] rounded-[var(--radius-md)] px-5 py-2.5 flex items-center gap-4 shadow-[var(--glass-shadow)] animate-in fade-in slide-in-from-bottom-4">
-              <span className="text-[var(--text-secondary)] text-sm font-['Space_Grotesk']">Edge</span>
-              <span className="font-bold text-[var(--accent)] text-base font-['Space_Grotesk']">
-                {typeof hoverLink.source === 'object' ? (hoverLink.source as any).id : hoverLink.source} →{' '}
-                {typeof hoverLink.target === 'object' ? (hoverLink.target as any).id : hoverLink.target}
-              </span>
-              <span className="w-px h-5 bg-[var(--border-subtle)]" />
-              <span className="text-[var(--text-secondary)] text-sm font-['Space_Grotesk']">Weight</span>
-              <span className="font-bold text-[var(--highlight)] text-base font-['Space_Grotesk']">
-                {hoverLink.weight ?? '—'}
-              </span>
-            </div>
+            <HoverTooltip
+              label="Edge"
+              value={`${edgeSource} → ${edgeTarget}`}
+              extraLabel="Weight"
+              extra={hoverLink.weight ?? '—'}
+            />
           )}
         </>
       )}

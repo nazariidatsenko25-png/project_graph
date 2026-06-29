@@ -1,13 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* =========================================================================
+   Design Tokens
+   ========================================================================= */
 :root {
-  --background: #0b1021;
+  --background: #080e1c;
   --foreground: #e8edf5;
-  --glass-bg: rgba(17, 24, 39, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  --glass-bg: rgba(13, 20, 38, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-shadow: 0 8px 40px 0 rgba(0, 0, 0, 0.45);
   --accent: #22d3ee;
+  --accent-dim: rgba(34, 211, 238, 0.15);
   --highlight: #818cf8;
+  --highlight-dim: rgba(129, 140, 248, 0.15);
   --danger: #fb7185;
   --success: #34d399;
   --text-secondary: #94a3b8;
@@ -15,46 +21,150 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+
+  --font-ui: 'Fira Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+}
+
+/* =========================================================================
+   Base
+   ========================================================================= */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
   background-color: var(--background);
   color: var(--foreground);
-  font-family: "Inter", "Space Grotesk", sans-serif;
+  font-family: var(--font-ui);
   overflow: hidden;
 }
 
-/* Glassmorphism Utilities */
+/* =========================================================================
+   Glassmorphism
+   ========================================================================= */
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
 }
 
+/* =========================================================================
+   Animated Scene Background
+   ========================================================================= */
 .scene-bg {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   z-index: -1;
-  background: radial-gradient(circle at 50% 50%, #1a2235 0%, #0b1021 100%);
+  background: radial-gradient(ellipse at 20% 20%, #0f1f3d 0%, #080e1c 55%),
+              radial-gradient(ellipse at 80% 80%, #0a1628 0%, transparent 60%);
+  overflow: hidden;
 }
 
-.scene-bg::after {
+/* Dot grid */
+.scene-bg::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: 
-    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  inset: 0;
+  background-image:
+    radial-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+    radial-gradient(rgba(129, 140, 248, 0.025) 1px, transparent 1px);
   background-size: 32px 32px, 128px 128px;
   background-position: 0 0, 16px 16px;
   pointer-events: none;
+}
+
+/* Animated ambient orbs */
+.scene-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 85%, rgba(129, 140, 248, 0.07) 0%, transparent 40%),
+    radial-gradient(circle at 85% 15%, rgba(34, 211, 238, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(17, 30, 65, 0.4) 0%, transparent 60%);
+  animation: orb-drift 20s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes orb-drift {
+  0%   { opacity: 0.7; transform: scale(1) rotate(0deg); }
+  50%  { opacity: 1;   transform: scale(1.06) rotate(2deg); }
+  100% { opacity: 0.8; transform: scale(0.97) rotate(-1deg); }
+}
+
+/* =========================================================================
+   Node pulse animation (used on selected nodes via canvas overlay)
+   ========================================================================= */
+@keyframes pulse-ring {
+  0%   { transform: scale(1);    opacity: 0.8; }
+  100% { transform: scale(1.6);  opacity: 0; }
+}
+
+/* =========================================================================
+   Custom Range Slider (cross-browser)
+   ========================================================================= */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-subtle);
+  outline: none;
+  cursor: pointer;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid rgba(255,255,255,0.3);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.7);
+}
+
+.range-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid rgba(255,255,255,0.3);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.5);
+  cursor: pointer;
+}
+
+/* =========================================================================
+   Focus Visible
+   ========================================================================= */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* =========================================================================
+   Prefers Reduced Motion
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .scene-bg::after {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
